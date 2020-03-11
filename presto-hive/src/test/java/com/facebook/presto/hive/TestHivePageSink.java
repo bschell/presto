@@ -243,7 +243,8 @@ public class TestHivePageSink
                 ImmutableMap.of(),
                 Optional.empty(),
                 false,
-                Optional.empty());
+                Optional.empty(),
+                null);
         TableHandle tableHandle = new TableHandle(
                 new ConnectorId(HIVE_CATALOG),
                 new HiveTableHandle(SCHEMA_NAME, TABLE_NAME),

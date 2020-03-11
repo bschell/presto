@@ -57,6 +57,7 @@ public class HiveSplit
     private final Optional<BucketConversion> bucketConversion;
     private final boolean s3SelectPushdownEnabled;
     private final Optional<byte[]> extraFileInfo;
+    private final Map<String, String> customSplitInfo;
 
     @JsonCreator
     public HiveSplit(
@@ -77,7 +78,8 @@ public class HiveSplit
             @JsonProperty("partitionSchemaDifference") Map<Integer, Column> partitionSchemaDifference,
             @JsonProperty("bucketConversion") Optional<BucketConversion> bucketConversion,
             @JsonProperty("s3SelectPushdownEnabled") boolean s3SelectPushdownEnabled,
-            @JsonProperty("extraFileInfo") Optional<byte[]> extraFileInfo)
+            @JsonProperty("extraFileInfo") Optional<byte[]> extraFileInfo,
+            @JsonProperty("customSplitInfo") Map<String, String> customSplitInfo)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(length >= 0, "length must be positive");
@@ -114,6 +116,7 @@ public class HiveSplit
         this.bucketConversion = bucketConversion;
         this.s3SelectPushdownEnabled = s3SelectPushdownEnabled;
         this.extraFileInfo = extraFileInfo;
+        this.customSplitInfo = customSplitInfo;
     }
 
     @JsonProperty
@@ -242,6 +245,12 @@ public class HiveSplit
     public Optional<byte[]> getExtraFileInfo()
     {
         return extraFileInfo;
+    }
+
+    @JsonProperty
+    public Map<String, String> getCustomSplitInfo()
+    {
+        return customSplitInfo;
     }
 
     @Override

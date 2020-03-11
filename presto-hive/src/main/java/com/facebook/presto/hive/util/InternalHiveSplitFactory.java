@@ -33,11 +33,14 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
 import static com.facebook.presto.hive.HiveUtil.isSplittable;
+import static com.facebook.presto.hive.util.CustomSplitConversionUtils.extractAnyCustomSplitInfo;
 import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.HARD_AFFINITY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -94,13 +97,15 @@ public class InternalHiveSplitFactory
                 readBucketNumber,
                 tableBucketNumber,
                 splittable,
-                fileInfo.getExtraFileInfo());
+                fileInfo.getExtraFileInfo(),
+                Collections.emptyMap());
     }
 
     public Optional<InternalHiveSplit> createInternalHiveSplit(FileSplit split)
             throws IOException
     {
         FileStatus file = fileSystem.getFileStatus(split.getPath());
+        Map<String, String> customSplitInfo = extractAnyCustomSplitInfo(split);
         return createInternalHiveSplit(
                 split.getPath(),
                 fileSystem.getFileBlockLocations(file, split.getStart(), split.getLength()),
@@ -110,7 +115,8 @@ public class InternalHiveSplitFactory
                 OptionalInt.empty(),
                 OptionalInt.empty(),
                 false,
-                Optional.empty());
+                Optional.empty(),
+                customSplitInfo);
     }
 
     private Optional<InternalHiveSplit> createInternalHiveSplit(
@@ -122,7 +128,8 @@ public class InternalHiveSplitFactory
             OptionalInt readBucketNumber,
             OptionalInt tableBucketNumber,
             boolean splittable,
-            Optional<byte[]> extraFileInfo)
+            Optional<byte[]> extraFileInfo,
+            Map<String, String> customSplitInfo)
     {
         String pathString = path.toString();
         if (!pathMatchesPredicate(pathDomain, pathString)) {
@@ -184,7 +191,8 @@ public class InternalHiveSplitFactory
                 forceLocalScheduling && allBlocksHaveRealAddress(blocks) ? HARD_AFFINITY : nodeSelectionStrategy,
                 s3SelectPushdownEnabled && S3SelectPushdown.isCompressionCodecSupported(inputFormat, path),
                 partitionInfo,
-                extraFileInfo));
+                extraFileInfo,
+                customSplitInfo));
     }
 
     private boolean needsHostAddresses(boolean forceLocalScheduling, List<HostAddress> addresses)
