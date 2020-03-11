@@ -16,6 +16,7 @@ package com.facebook.presto.hive;
 import com.facebook.presto.hadoop.TextLineLengthLimitExceededException;
 import com.facebook.presto.hive.avro.PrestoAvroSerDe;
 import com.facebook.presto.hive.metastore.Column;
+import com.facebook.presto.hive.metastore.Storage;
 import com.facebook.presto.hive.metastore.Table;
 import com.facebook.presto.hive.pagefile.PageInputFormat;
 import com.facebook.presto.hive.util.FooterAwareRecordReader;
@@ -38,6 +39,7 @@ import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.base.Joiner;
+import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
@@ -83,11 +85,13 @@ import org.joda.time.format.ISODateTimeFormat;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -118,6 +122,7 @@ import static com.facebook.presto.hive.metastore.MetastoreUtil.HIVE_DEFAULT_DYNA
 import static com.facebook.presto.hive.metastore.MetastoreUtil.checkCondition;
 import static com.facebook.presto.hive.util.ConfigurationUtils.copy;
 import static com.facebook.presto.hive.util.ConfigurationUtils.toJobConf;
+import static com.facebook.presto.hive.util.CustomSplitConversionUtils.recreateSplitWithCustomInfo;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -158,6 +163,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.DECIMAL_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_ALL_COLUMNS;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR;
+import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 
 public final class HiveUtil
@@ -202,7 +208,7 @@ public final class HiveUtil
     {
     }
 
-    public static RecordReader<?, ?> createRecordReader(Configuration configuration, Path path, long start, long length, Properties schema, List<HiveColumnHandle> columns)
+    public static RecordReader<?, ?> createRecordReader(Configuration configuration, Path path, long start, long length, Properties schema, List<HiveColumnHandle> columns, Map<String, String> customSplitInfo)
     {
         // determine which hive columns we will read
         List<HiveColumnHandle> readColumns = ImmutableList.copyOf(filter(columns, column -> column.getColumnType() == REGULAR));
@@ -211,14 +217,26 @@ public final class HiveUtil
         // Tell hive the columns we would like to read, this lets hive optimize reading column oriented files
         setReadColumns(configuration, readHiveColumnIndexes);
 
+        // Only propagate serialization schema configs by default
+        Predicate<String> schemaFilter = schemaProperty -> schemaProperty.startsWith("serialization.");
+
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, getInputFormatName(schema), true);
         JobConf jobConf = toJobConf(configuration);
         FileSplit fileSplit = new FileSplit(path, start, length, (String[]) null);
+        if (customSplitInfo != null && !customSplitInfo.isEmpty()) {
+            fileSplit = recreateSplitWithCustomInfo(fileSplit, customSplitInfo);
 
-        // propagate serialization configuration to getRecordReader
+            // Add additional column information for record reader
+            List<String> readHiveColumnNames = ImmutableList.copyOf(transform(readColumns, HiveColumnHandle::getName));
+            jobConf.set(READ_COLUMN_NAMES_CONF_STR, Joiner.on(',').join(readHiveColumnNames));
+
+            // Remove filter when using customSplitInfo as the record reader requires complete schema configs
+            schemaFilter = schemaProperty -> true;
+        }
+
         schema.stringPropertyNames().stream()
-                .filter(name -> name.startsWith("serialization."))
-                .forEach(name -> jobConf.set(name, schema.getProperty(name)));
+            .filter(schemaFilter)
+            .forEach(name -> jobConf.set(name, schema.getProperty(name)));
 
         // add Airlift LZO and LZOP to head of codecs list so as to not override existing entries
         List<String> codecs = newArrayList(Splitter.on(",").trimResults().omitEmptyStrings().split(jobConf.get("io.compression.codecs", "")));
@@ -284,7 +302,7 @@ public final class HiveUtil
         return Optional.ofNullable(compressionCodecFactory.getCodec(file));
     }
 
-    static InputFormat<?, ?> getInputFormat(Configuration configuration, String inputFormatName, boolean symlinkTarget)
+    public static InputFormat<?, ?> getInputFormat(Configuration configuration, String inputFormatName, boolean symlinkTarget)
     {
         try {
             JobConf jobConf = toJobConf(configuration);
@@ -325,6 +343,15 @@ public final class HiveUtil
         String name = schema.getProperty(FILE_INPUT_FORMAT);
         checkCondition(name != null, HIVE_INVALID_METADATA, "Table or partition is missing Hive input format property: %s", FILE_INPUT_FORMAT);
         return name;
+    }
+
+    public static boolean shouldUseRecordReaderFromInputFormat(Configuration configuration, Storage storage)
+    {
+        InputFormat<?, ?> inputFormat = HiveUtil.getInputFormat(configuration, storage.getStorageFormat().getInputFormat(), false);
+        return Arrays.stream(inputFormat.getClass().getAnnotations())
+            .map(Annotation::annotationType)
+            .map(Class::getSimpleName)
+            .anyMatch(name -> name.equals("UseRecordReaderFromInputFormat"));
     }
 
     public static long parseHiveDate(String value)

@@ -14,6 +14,8 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
+import com.facebook.presto.hive.metastore.Storage;
+import com.facebook.presto.hive.metastore.StorageFormat;
 import com.facebook.presto.hive.metastore.file.FileHiveMetastore;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
@@ -30,17 +32,22 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 
 import static com.facebook.airlift.testing.Assertions.assertInstanceOf;
 import static com.facebook.presto.hive.HiveUtil.getDeserializer;
 import static com.facebook.presto.hive.HiveUtil.parseHiveTimestamp;
+import static com.facebook.presto.hive.HiveUtil.shouldUseRecordReaderFromInputFormat;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.toPartitionValues;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_CLASS;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_FORMAT;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 public class TestHiveUtil
 {
@@ -85,6 +92,20 @@ public class TestHiveUtil
         assertToPartitionValues("a=1");
         assertToPartitionValues("pk=!@%23$%25%5E&%2A()%2F%3D");
         assertToPartitionValues("pk=__HIVE_DEFAULT_PARTITION__");
+    }
+
+    @Test
+    public void testShouldUseRecordReaderFromInputFormatTrue()
+    {
+        StorageFormat storageFormat = StorageFormat.create("parquet.hive.serde.ParquetHiveSerDe", "org.apache.hudi.hadoop.realtime.HoodieParquetRealtimeInputFormat", "");
+        assertTrue(shouldUseRecordReaderFromInputFormat(new Configuration(), new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap())));
+    }
+
+    @Test
+    public void testShouldUseRecordReaderFromInputFormatFalse()
+    {
+        StorageFormat storageFormat = StorageFormat.create("parquet.hive.serde.ParquetHiveSerDe", "org.apache.hudi.hadoop.HoodieParquetInputFormat", "");
+        assertFalse(shouldUseRecordReaderFromInputFormat(new Configuration(), new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap())));
     }
 
     private static void assertToPartitionValues(String partitionName)

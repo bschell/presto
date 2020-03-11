@@ -420,7 +420,8 @@ public enum FileFormat
                         TupleDomain.all(),
                         DateTimeZone.forID(session.getTimeZoneKey().getId()),
                         TYPE_MANAGER,
-                        false)
+                        false,
+                        null)
                 .get();
         return new RecordPageSource(columnTypes, recordCursor);
     }

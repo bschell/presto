@@ -64,6 +64,7 @@ public class InternalHiveSplit
     private final boolean s3SelectPushdownEnabled;
     private final HiveSplitPartitionInfo partitionInfo;
     private final Optional<byte[]> extraFileInfo;
+    private final Map<String, String> customSplitInfo;
 
     private long start;
     private int currentBlockIndex;
@@ -80,7 +81,8 @@ public class InternalHiveSplit
             NodeSelectionStrategy nodeSelectionStrategy,
             boolean s3SelectPushdownEnabled,
             HiveSplitPartitionInfo partitionInfo,
-            Optional<byte[]> extraFileInfo)
+            Optional<byte[]> extraFileInfo,
+            Map<String, String> customSplitInfo)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(end >= 0, "end must be positive");
@@ -103,6 +105,7 @@ public class InternalHiveSplit
         this.s3SelectPushdownEnabled = s3SelectPushdownEnabled;
         this.partitionInfo = partitionInfo;
         this.extraFileInfo = extraFileInfo;
+        this.customSplitInfo = customSplitInfo;
 
         ImmutableList.Builder<List<HostAddress>> addressesBuilder = ImmutableList.builder();
         blockEndOffsets = new long[blocks.size()];
@@ -211,6 +214,11 @@ public class InternalHiveSplit
     public Optional<byte[]> getExtraFileInfo()
     {
         return extraFileInfo;
+    }
+
+    public Map<String, String> getCustomSplitInfo()
+    {
+        return customSplitInfo;
     }
 
     public void reset()
