@@ -98,14 +98,14 @@ public class TestHiveUtil
     public void testShouldUseRecordReaderFromInputFormatTrue()
     {
         StorageFormat storageFormat = StorageFormat.create("parquet.hive.serde.ParquetHiveSerDe", "org.apache.hudi.hadoop.realtime.HoodieParquetRealtimeInputFormat", "");
-        assertTrue(shouldUseRecordReaderFromInputFormat(new Configuration(), new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap())));
+        assertTrue(shouldUseRecordReaderFromInputFormat(new Configuration(), new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap(), Collections.emptyMap())));
     }
 
     @Test
     public void testShouldUseRecordReaderFromInputFormatFalse()
     {
         StorageFormat storageFormat = StorageFormat.create("parquet.hive.serde.ParquetHiveSerDe", "org.apache.hudi.hadoop.HoodieParquetInputFormat", "");
-        assertFalse(shouldUseRecordReaderFromInputFormat(new Configuration(), new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap())));
+        assertFalse(shouldUseRecordReaderFromInputFormat(new Configuration(), new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap(), Collections.emptyMap())));
     }
 
     private static void assertToPartitionValues(String partitionName)

@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.parquet;
 
+import com.facebook.presto.common.type.TestingTypeManager;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
 import com.facebook.presto.hive.HdfsConfigurationInitializer;
 import com.facebook.presto.hive.HdfsEnvironment;
@@ -23,7 +24,6 @@ import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
 import com.facebook.presto.hive.metastore.Storage;
 import com.facebook.presto.hive.metastore.StorageFormat;
 import com.facebook.presto.spi.ConnectorPageSource;
-import com.facebook.presto.spi.type.TestingTypeManager;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hudi.hadoop.realtime.HoodieParquetRealtimeInputFormat;
@@ -53,7 +53,7 @@ public class TestParquetPageSourceFactory
     public void testCreatePageSourceEmptyWithoutParquetSerDe()
     {
         StorageFormat storageFormat = StorageFormat.create("random.test.serde", "random.test.inputformat", "");
-        Storage storage = new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap());
+        Storage storage = new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap(), Collections.emptyMap());
         Optional<? extends ConnectorPageSource> optionalPageSource = parquetPageSourceFactory.createPageSource(new Configuration(), null, null, 0L, 0L, 0L, storage, null, null, null, null, null);
         assertFalse(optionalPageSource.isPresent());
     }
@@ -62,7 +62,7 @@ public class TestParquetPageSourceFactory
     public void testCreatePageSourceEmptyWithParquetSerDeAndAnnotation()
     {
         StorageFormat storageFormat = StorageFormat.create(PARQUET_HIVE_SERDE, HoodieParquetRealtimeInputFormat.class.getName(), "");
-        Storage storage = new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap());
+        Storage storage = new Storage(storageFormat, "test", Optional.empty(), true, Collections.emptyMap(), Collections.emptyMap());
         Optional<? extends ConnectorPageSource> optionalPageSource = parquetPageSourceFactory.createPageSource(new Configuration(), null, null, 0L, 0L, 0L, storage, null, null, null, null, null);
         assertFalse(optionalPageSource.isPresent());
     }
