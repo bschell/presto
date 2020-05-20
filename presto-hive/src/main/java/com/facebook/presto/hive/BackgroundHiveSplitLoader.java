@@ -46,6 +46,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hudi.hadoop.HoodieParquetInputFormat;
 import org.apache.hudi.hadoop.HoodieROTablePathFilter;
+import org.apache.hudi.hadoop.realtime.HoodieParquetRealtimeInputFormat;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -366,7 +367,7 @@ public class BackgroundHiveSplitLoader
                         bucketConversionRequiresWorkerParticipation ? bucketConversion : Optional.empty()),
                 schedulerUsesHostAddresses);
 
-        if (!isHudiInputFormat(inputFormat) && shouldUseFileSplitsFromInputFormat(inputFormat)) {
+        if (!isHudiParquetInputFormat(inputFormat) && shouldUseFileSplitsFromInputFormat(inputFormat)) {
             if (tableBucketInfo.isPresent()) {
                 throw new PrestoException(NOT_SUPPORTED, "Presto cannot read bucketed partition in an input format with UseFileSplitsFromInputFormat annotation: " + inputFormat.getClass().getSimpleName());
             }
@@ -376,7 +377,7 @@ public class BackgroundHiveSplitLoader
 
             return addSplitsToSource(splits, splitFactory);
         }
-        PathFilter pathFilter = isHudiInputFormat(inputFormat) ? hoodiePathFilterSupplier.get() : path1 -> true;
+        PathFilter pathFilter = isHudiParquetInputFormat(inputFormat) ? hoodiePathFilterSupplier.get() : path1 -> true;
         // S3 Select pushdown works at the granularity of individual S3 objects,
         // therefore we must not split files when it is enabled.
         Properties schema = getHiveSchema(storage.getSerdeParameters(), table.getParameters());
@@ -415,8 +416,11 @@ public class BackgroundHiveSplitLoader
         return lastResult;
     }
 
-    private static boolean isHudiInputFormat(InputFormat<?, ?> inputFormat)
+    private static boolean isHudiParquetInputFormat(InputFormat<?, ?> inputFormat)
     {
+        if (inputFormat instanceof HoodieParquetRealtimeInputFormat) {
+            return false;
+        }
         return inputFormat instanceof HoodieParquetInputFormat;
     }
 
